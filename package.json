@@ -64,8 +64,8 @@
     "vinyl-fs": "^1.0.0"
   },
   "optionalDependencies": {
-    "sprity-sass": "^1.0.4",
-    "sprity-gm": "^1.0.2"
+    "sprity-sass": "1.0.3",
+    "sprity-gm": "1.0.2"
   },
   "devDependencies": {
     "chai": "^2.2.0",
