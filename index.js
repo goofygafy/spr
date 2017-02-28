@@ -3,7 +3,6 @@
 var _ = require('lodash');
 var vfs = require('vinyl-fs');
 var ifStream = require('ternary-stream');
-var through2 = require('through2').obj;
 
 var tile = require('./lib/tile');
 var layout = require('./lib/layout');
@@ -11,7 +10,6 @@ var sprite = require('./lib/sprite');
 var style = require('./lib/style');
 var toVinyl = require('./lib/to-vinyl');
 var noop = function () {};
-var error = null;
 
 var defaults = {
   'src': null,
@@ -40,22 +38,6 @@ var defaults = {
   }
 };
 
-var handleError = function () {
-  return function (err) {
-    error = true;
-    this.push(err);
-  };
-};
-
-var handleCallbackError = function (cb) {
-  return function (err) {
-    error = true;
-    if (_.isFunction(cb)) {
-      cb(err);
-    }
-  };
-};
-
 module.exports = {
   /*
    *  creates sprite and style file and save them to disk
@@ -66,13 +48,14 @@ module.exports = {
     }
 
     this.src(o)
-      .on('error', handleCallbackError(cb))
-      .pipe(vfs.dest(function (file) {
-        return file.base;
-      }))
-      .on('error', handleCallbackError(cb))
+      .pipe(vfs.dest(o.out))
+      .on('error', function (err) {
+        if (_.isFunction(cb)) {
+          cb(err);
+        }
+      })
       .on('end', function () {
-        if (_.isFunction(cb) && !error) {
+        if (_.isFunction(cb)) {
           cb();
         }
       });
@@ -82,7 +65,7 @@ module.exports = {
    */
   src: function (o) {
     if (!o.src) {
-      throw new Error('src dir missing');
+      throw new Error('glob missing');
     }
 
     var opts = _.extend({}, defaults, o);
@@ -90,27 +73,11 @@ module.exports = {
     var hasStyle = function () {
       return !!opts.style;
     };
-
-    var stream = vfs.src(opts.src)
+    return vfs.src(opts.src)
       .pipe(tile(opts))
-      .on('error', handleError())
       .pipe(layout(opts))
-      .on('error', handleError())
       .pipe(sprite(opts))
-      .on('error', handleError())
       .pipe(ifStream(hasStyle, style(opts)))
-      .on('error', handleError())
-      .pipe(toVinyl(opts))
-      .on('error', handleError())
-      .pipe(through2(function (obj, enc, cb) {
-        if (obj instanceof Error) {
-          cb(obj, null);
-        }
-        else {
-          cb(null, obj);
-        }
-      }));
-
-    return stream;
+      .pipe(toVinyl(opts));
   }
 };
